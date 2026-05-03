@@ -208,5 +208,5 @@ Deferred:
 - Dedupe windows.
 - Flutter-specific helper package.
 - Additional transports such as Discord or Telegram.
-# pulse_logger
+
 # pulse_logger
