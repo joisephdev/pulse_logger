@@ -1,5 +1,7 @@
 # pulse_logger
 
+![pulse_logger logo](pulse_logger.png)
+
 `pulse_logger` is a Dart-first operational event logger for apps that need lightweight process tracing, QA/production debugging, and alert-style event delivery without adopting a full analytics stack.
 
 It gives you a small SDK-style API:
