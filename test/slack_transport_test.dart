@@ -1,48 +1,44 @@
 import 'dart:async';
 import 'dart:convert';
-
-import 'package:http/http.dart' as http;
-import 'package:http/testing.dart';
 import 'package:pulse_logger/pulse_logger.dart';
 import 'package:test/test.dart';
 
 void main() {
   group('SlackTransport', () {
     test('posts JSON payloads to the webhook', () async {
-      late http.Request capturedRequest;
-      final client = MockClient((request) async {
-        capturedRequest = request;
-        return http.Response('ok', 200);
-      });
+      late Uri capturedUrl;
+      late Map<String, String> capturedHeaders;
+      late String capturedBody;
       final transport = SlackTransport(
         webhookUrl: 'https://hooks.slack.com/services/test',
-        client: client,
+        post: (url, headers, body) async {
+          capturedUrl = url;
+          capturedHeaders = headers;
+          capturedBody = body;
+          return (statusCode: 200, body: 'ok');
+        },
       );
 
       await transport.send(_event());
 
-      expect(capturedRequest.method, 'POST');
       expect(
-        capturedRequest.url,
+        capturedUrl,
         Uri.parse('https://hooks.slack.com/services/test'),
       );
       expect(
-        capturedRequest.headers['content-type'],
+        capturedHeaders['content-type'],
         'application/json; charset=utf-8',
       );
-      final body = jsonDecode(capturedRequest.body) as Map<String, dynamic>;
+      final body = jsonDecode(capturedBody) as Map<String, dynamic>;
       expect(body['text'], '[ERROR] Payment failed');
       expect(body['attachments'], isA<List<dynamic>>());
       expect(body['blocks'], isA<List<dynamic>>());
     });
 
     test('throws on non-2xx responses', () async {
-      final client = MockClient((request) async {
-        return http.Response('nope', 500);
-      });
       final transport = SlackTransport(
         webhookUrl: 'https://hooks.slack.com/services/test',
-        client: client,
+        post: (url, headers, body) async => (statusCode: 500, body: 'nope'),
       );
 
       await expectLater(
@@ -52,12 +48,9 @@ void main() {
     });
 
     test('throws on network errors', () async {
-      final client = MockClient((request) async {
-        throw StateError('network down');
-      });
       final transport = SlackTransport(
         webhookUrl: 'https://hooks.slack.com/services/test',
-        client: client,
+        post: (url, headers, body) async => throw StateError('network down'),
       );
 
       await expectLater(
@@ -67,14 +60,19 @@ void main() {
     });
 
     test('honors timeout', () async {
-      final client = MockClient((request) async {
+      Future<({int statusCode, String body})> neverResolve(
+        Uri url,
+        Map<String, String> headers,
+        String body,
+      ) async {
         await Completer<void>().future;
-        return http.Response('ok', 200);
-      });
+        return (statusCode: 200, body: 'ok');
+      }
+
       final transport = SlackTransport(
         webhookUrl: 'https://hooks.slack.com/services/test',
         timeout: const Duration(milliseconds: 1),
-        client: client,
+        post: neverResolve,
       );
 
       await expectLater(
@@ -83,20 +81,19 @@ void main() {
       );
     });
 
-    test('does not close injected clients on dispose', () async {
-      var closed = false;
-      final client = _ClosableMockClient(
-        (request) async => http.Response('ok', 200),
-        onClose: () => closed = true,
-      );
+    test('dispose is a no-op when using an injected post override', () async {
+      var called = false;
       final transport = SlackTransport(
         webhookUrl: 'https://hooks.slack.com/services/test',
-        client: client,
+        post: (url, headers, body) async {
+          called = true;
+          return (statusCode: 200, body: 'ok');
+        },
       );
 
       await transport.dispose();
 
-      expect(closed, isFalse);
+      expect(called, isFalse);
     });
   });
 }
@@ -111,16 +108,4 @@ LogEvent _event() {
     appName: 'My App',
     properties: <String, dynamic>{'gateway': 'stripe'},
   );
-}
-
-class _ClosableMockClient extends MockClient {
-  _ClosableMockClient(super.fn, {required this.onClose});
-
-  final void Function() onClose;
-
-  @override
-  void close() {
-    onClose();
-    super.close();
-  }
 }
