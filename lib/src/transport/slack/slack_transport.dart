@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-
-import 'package:http/http.dart' as http;
+import 'dart:io';
 
 import '../../core/log_event.dart';
 import '../transport.dart';
@@ -48,11 +47,15 @@ class SlackTransport implements Transport {
   SlackTransport({
     required String webhookUrl,
     this.timeout = const Duration(seconds: 5),
-    http.Client? client,
+    Future<({int statusCode, String body})> Function(
+      Uri url,
+      Map<String, String> headers,
+      String body,
+    )? post,
     SlackPayloadBuilder? payloadBuilder,
   })  : webhookUrl = Uri.parse(webhookUrl),
-        _client = client ?? http.Client(),
-        _ownsClient = client == null,
+        _httpClient = post == null ? HttpClient() : null,
+        _postOverride = post,
         _payloadBuilder = payloadBuilder ?? const SlackPayloadBuilder();
 
   /// Slack Incoming Webhook URL owned by this transport.
@@ -61,8 +64,12 @@ class SlackTransport implements Transport {
   /// Timeout budget for webhook POST requests.
   final Duration timeout;
 
-  final http.Client _client;
-  final bool _ownsClient;
+  final HttpClient? _httpClient;
+  final Future<({int statusCode, String body})> Function(
+    Uri url,
+    Map<String, String> headers,
+    String body,
+  )? _postOverride;
   final SlackPayloadBuilder _payloadBuilder;
 
   @override
@@ -80,22 +87,34 @@ class SlackTransport implements Transport {
 
   @override
   Future<void> dispose() async {
-    if (_ownsClient) {
-      _client.close();
-    }
+    _httpClient?.close(force: true);
   }
 
-  Future<http.Response> _post(Map<String, dynamic> payload) async {
+  Future<({int statusCode, String body})> _post(
+    Map<String, dynamic> payload,
+  ) async {
+    final headers = const <String, String>{
+      'content-type': 'application/json; charset=utf-8',
+    };
+    final body = jsonEncode(payload);
+
     try {
-      return await _client
-          .post(
-            webhookUrl,
-            headers: const <String, String>{
-              'content-type': 'application/json; charset=utf-8',
-            },
-            body: jsonEncode(payload),
-          )
-          .timeout(timeout);
+      if (_postOverride != null) {
+        return await _postOverride!(webhookUrl, headers, body).timeout(timeout);
+      }
+
+      final client = _httpClient;
+      if (client == null) {
+        throw const SlackTransportException(
+            'Slack transport is not initialized.');
+      }
+
+      final request = await client.postUrl(webhookUrl).timeout(timeout);
+      headers.forEach(request.headers.set);
+      request.write(body);
+      final response = await request.close().timeout(timeout);
+      final responseBody = await utf8.decodeStream(response).timeout(timeout);
+      return (statusCode: response.statusCode, body: responseBody);
     } on SlackTransportException {
       rethrow;
     } on TimeoutException catch (error) {
