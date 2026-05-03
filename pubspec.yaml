@@ -1,0 +1,19 @@
+name: pulse_logger
+description: Dart-first operational event logger for sending sanitized app events to Console and Slack transports.
+version: 0.1.0
+topics:
+  - logging
+  - slack
+  - observability
+  - diagnostics
+  - alerts
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  http: ^1.2.0
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.25.6

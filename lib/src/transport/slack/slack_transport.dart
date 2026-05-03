@@ -1,0 +1,113 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:http/http.dart' as http;
+
+import '../../core/log_event.dart';
+import '../transport.dart';
+import 'slack_payload_builder.dart';
+
+/// Exception thrown when Slack delivery fails.
+///
+/// Example:
+/// ```dart
+/// try {
+///   await transport.send(event);
+/// } on SlackTransportException {
+///   // Handle or let the future PulseLogger facade swallow it.
+/// }
+/// ```
+class SlackTransportException implements Exception {
+  /// Creates a Slack transport exception.
+  const SlackTransportException(this.message, {this.cause});
+
+  /// Human-readable failure description.
+  final String message;
+
+  /// Optional underlying error.
+  final Object? cause;
+
+  @override
+  String toString() {
+    if (cause == null) {
+      return 'SlackTransportException: $message';
+    }
+    return 'SlackTransportException: $message ($cause)';
+  }
+}
+
+/// Sends events to Slack through an Incoming Webhook.
+///
+/// Example:
+/// ```dart
+/// final transport = SlackTransport(webhookUrl: webhookUrl);
+/// await transport.send(event);
+/// ```
+class SlackTransport implements Transport {
+  /// Creates a Slack transport with optional injectable dependencies.
+  SlackTransport({
+    required String webhookUrl,
+    this.timeout = const Duration(seconds: 5),
+    http.Client? client,
+    SlackPayloadBuilder? payloadBuilder,
+  })  : webhookUrl = Uri.parse(webhookUrl),
+        _client = client ?? http.Client(),
+        _ownsClient = client == null,
+        _payloadBuilder = payloadBuilder ?? const SlackPayloadBuilder();
+
+  /// Slack Incoming Webhook URL owned by this transport.
+  final Uri webhookUrl;
+
+  /// Timeout budget for webhook POST requests.
+  final Duration timeout;
+
+  final http.Client _client;
+  final bool _ownsClient;
+  final SlackPayloadBuilder _payloadBuilder;
+
+  @override
+  Future<void> send(LogEvent event) async {
+    final payload = _payloadBuilder.build(event);
+    final response = await _post(payload);
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw SlackTransportException(
+        'Slack webhook returned HTTP ${response.statusCode}.',
+        cause: response.body,
+      );
+    }
+  }
+
+  @override
+  Future<void> dispose() async {
+    if (_ownsClient) {
+      _client.close();
+    }
+  }
+
+  Future<http.Response> _post(Map<String, dynamic> payload) async {
+    try {
+      return await _client
+          .post(
+            webhookUrl,
+            headers: const <String, String>{
+              'content-type': 'application/json; charset=utf-8',
+            },
+            body: jsonEncode(payload),
+          )
+          .timeout(timeout);
+    } on SlackTransportException {
+      rethrow;
+    } on TimeoutException catch (error) {
+      throw SlackTransportException(
+        'Slack webhook request timed out after $timeout.',
+        cause: error,
+      );
+    } on Object catch (error) {
+      throw SlackTransportException(
+        'Slack webhook request failed.',
+        cause: error,
+      );
+    }
+  }
+}
