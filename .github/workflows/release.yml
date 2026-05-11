@@ -13,6 +13,7 @@ jobs:
     permissions:
       contents: write
       actions: write
+      id-token: write
 
     steps:
       - name: Checkout
@@ -81,8 +82,15 @@ jobs:
           body: ${{ steps.changelog.outputs.notes }}
           generate_release_notes: false
 
-      - name: Trigger publish to pub.dev
+      - name: Checkout release tag for pub.dev
         if: steps.check_tag.outputs.exists == 'false'
-        run: gh workflow run publish.yml --ref ${{ steps.version.outputs.tag }}
-        env:
-          GH_TOKEN: ${{ github.token }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.version.outputs.tag }}
+
+      - name: Publish to pub.dev
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          dart pub get
+          dart pub publish --dry-run
+          dart pub publish --force

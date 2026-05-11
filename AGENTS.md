@@ -66,17 +66,15 @@ Before publishing a new version:
 
 ## CI / Release Workflow
 
-This project uses three workflows:
+This project uses two workflows:
 
 - `.github/workflows/ci.yml`
 - `.github/workflows/release.yml`
-- `.github/workflows/publish.yml`
 
 Expected flow:
 
 1. CI validates formatting, analysis, tests, coverage, and publish dry-run on PRs.
-2. Release workflow creates a tag and GitHub release after merge or manual dispatch.
-3. Publish workflow performs the final pub.dev publish.
+2. Release workflow creates a tag, a GitHub Release, and runs `dart pub publish --force` to pub.dev (OIDC) after a PR to `main` is merged, or when run manually (`workflow_dispatch`).
 
 ## Known Deferred Items
 
