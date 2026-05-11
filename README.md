@@ -23,7 +23,7 @@ The first built-in transports are:
 
 ```yaml
 dependencies:
-  pulse_logger: ^0.2.0
+  pulse_logger: ^0.2.1
 ```
 
 ```dart
@@ -257,7 +257,7 @@ Your proxy can enforce authentication, rate limits, payload validation, environm
 
 ## Current Scope
 
-Included in `0.2.0`:
+Included in `0.2.1`:
 
 - Dart-only SDK.
 - Console transport.

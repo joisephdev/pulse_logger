@@ -15,6 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Flutter-specific helpers.
 - Additional transports.
 
+## [0.2.1] - 2026-05-11
+
+### Documentation
+
+- Documented this release in `CHANGELOG.md` to match `pubspec.yaml` for pub.dev validation.
+- Aligned install example in `README.md` with `0.2.1`.
+
 ## [0.2.0] - 2026-05-11
 
 ### Added
@@ -58,7 +65,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Level filtering, default properties, app/session metadata, silent failures, and `onError`.
 - Unit tests for models, sanitization, transports, facade behavior, and failure handling.
 
-[Unreleased]: https://github.com/joisephdev/pulse_logger/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/joisephdev/pulse_logger/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/joisephdev/pulse_logger/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/joisephdev/pulse_logger/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/joisephdev/pulse_logger/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/joisephdev/pulse_logger/releases/tag/v0.1.0
