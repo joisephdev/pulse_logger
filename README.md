@@ -23,7 +23,7 @@ The first built-in transports are:
 
 ```yaml
 dependencies:
-  pulse_logger: ^0.1.0
+  pulse_logger: ^0.2.0
 ```
 
 ```dart
@@ -44,6 +44,7 @@ final logger = PulseLogger(
 await logger.info(
   event: 'user_login_started',
   title: 'User login started',
+  message: 'The user selected Google as the authentication provider.',
   properties: {
     'source': 'google',
   },
@@ -99,14 +100,20 @@ final config = PulseConfig(
   appName: 'Checkout App',
   enabled: true,
   silentFailures: true,
+  includePlatformContext: true,
   minimumLevel: LogLevel.info,
   defaultProperties: {
     'team': 'mobile',
+  },
+  resolveProperties: () => {
+    'is_logged_in': true,
+    'user_id': 'user-123',
   },
   sensitiveKeys: [
     'email',
     'phone',
   ],
+  redactKeysBySubstring: true,
   sessionId: 'session-123',
   appVersion: '1.2.3',
   buildNumber: '42',
@@ -117,12 +124,16 @@ Important defaults:
 
 - `enabled: true`
 - `silentFailures: true`
+- `includePlatformContext: true`
+- `redactKeysBySubstring: true`
 - `minimumLevel: LogLevel.debug`
 - `timeout: Duration(seconds: 5)` on `PulseConfig`; Slack transport also accepts its own timeout.
 - `defaultProperties: const {}`
 - `sensitiveKeys: const []`
 
 `webhookUrl` intentionally belongs to `SlackTransport`, not `PulseConfig`, so channel-specific secrets stay at the transport boundary.
+
+`resolveProperties` is useful for dynamic context that changes while the app is running, such as the current user, locale, country, request id, or feature flag state. These values are merged into each event before sanitization, and explicit per-event properties can override them.
 
 ## Sanitization
 
@@ -151,11 +162,13 @@ final config = PulseConfig(
 );
 ```
 
-Matching is case-insensitive and nested maps/lists are sanitized recursively.
+Matching is case-insensitive. By default, keys are also redacted when they contain a sensitive key fragment, so `firebase_id_token` is redacted because it contains `token`. Nested maps/lists are sanitized recursively.
+
+Set `redactKeysBySubstring: false` if you need exact-key matching only.
 
 ## Failure Behavior
 
-By default, `pulse_logger` should never break your app when a transport fails.
+By default, `pulse_logger` should never break your app when event preparation or a transport fails.
 
 ```dart
 final logger = PulseLogger(
@@ -166,12 +179,63 @@ final logger = PulseLogger(
   ),
   transport: SlackTransport(webhookUrl: webhookUrl),
   onError: (error, stackTrace) {
-    // Optional visibility into transport failures.
+    // Optional visibility into event preparation or transport failures.
   },
 );
 ```
 
-For tests or debug tooling, set `silentFailures: false` to rethrow transport failures.
+For tests or debug tooling, set `silentFailures: false` to rethrow event preparation or transport failures.
+
+## Flutter and App Context
+
+`pulse_logger` stays Dart-first and does not depend on Flutter, GetX, or `package_info_plus`. Flutter apps should collect app-specific context in the host app and pass it into `PulseConfig`.
+
+```dart
+final config = PulseConfig(
+  environment: envName,
+  appName: appName,
+  appVersion: packageInfo.version,
+  buildNumber: packageInfo.buildNumber,
+  resolveProperties: () {
+    final profile = mainController.userProfile;
+
+    return {
+      'is_logged_in': mainController.isLoggedIn,
+      'user_id': profile?.user.id,
+      'user_email': profile?.user.email,
+      'country_id': profile?.countryId,
+      'language': mainController.currentLanguage,
+    };
+  },
+);
+```
+
+This keeps the reusable package clean while preserving the richer context that an app-specific logger can provide.
+
+## Flutter Web
+
+The default `SlackTransport` implementation uses `dart:io` `HttpClient`, which is suitable for Dart VM, mobile, and desktop targets. For Flutter Web, provide the `post` override with a web-compatible HTTP implementation owned by your app:
+
+```dart
+final transport = SlackTransport(
+  webhookUrl: webhookUrl,
+  post: (url, headers, body) async {
+    // Use your app's web-compatible HTTP client here.
+    final response = await client.post(url, headers: headers, body: body);
+    return (statusCode: response.statusCode, body: response.body);
+  },
+);
+```
+
+## Migrating From an App-specific Slack Logger
+
+If you already have a custom `SlackLogger`, keep app-owned concepts in the app and map them into Pulse Logger:
+
+- Event constants such as `SlackLogEvent.googleAuthStarted` can become app-owned string constants passed to `event:`.
+- Environment configuration maps to `PulseConfig(environment: ..., appName: ..., minimumLevel: ...)`.
+- User context previously read from a controller should move into `resolveProperties`.
+- Long Slack body text should use `message`, while `title` stays short and human-readable.
+- GetX or another DI framework can own a `PulseLogger` instance, but the package itself stays framework-neutral.
 
 ## Security Notice for Mobile Apps
 
@@ -193,13 +257,16 @@ Your proxy can enforce authentication, rate limits, payload validation, environm
 
 ## Current Scope
 
-Included in `0.1.0`:
+Included in `0.2.0`:
 
 - Dart-only SDK.
 - Console transport.
 - Slack Incoming Webhook transport.
 - Multi-transport fan-out.
 - Sanitized event properties.
+- Dynamic property enrichment.
+- Optional platform context.
+- Long-form event messages.
 - Level filtering.
 - Silent failure handling.
 
@@ -210,5 +277,3 @@ Deferred:
 - Dedupe windows.
 - Flutter-specific helper package.
 - Additional transports such as Discord or Telegram.
-
-# pulse_logger

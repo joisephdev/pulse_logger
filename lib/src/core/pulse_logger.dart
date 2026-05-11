@@ -1,11 +1,12 @@
 import '../config/pulse_config.dart';
 import '../pipeline/data_sanitizer.dart';
+import '../platform/platform_context.dart';
 import '../transport/multi_transport.dart';
 import '../transport/transport.dart';
 import 'log_event.dart';
 import 'log_level.dart';
 
-/// Callback invoked when transport delivery fails.
+/// Callback invoked when event preparation or transport delivery fails.
 ///
 /// Example:
 /// ```dart
@@ -21,7 +22,11 @@ typedef PulseLoggerErrorCallback = void Function(
 /// Example:
 /// ```dart
 /// final logger = PulseLogger(config: config, transport: transport);
-/// await logger.info(event: 'user_login_started', title: 'User login started');
+/// await logger.info(
+///   event: 'user_login_started',
+///   title: 'User login started',
+///   message: 'The user selected Google as the provider.',
+/// );
 /// ```
 class PulseLogger {
   /// Creates a logger using a single [transport].
@@ -31,6 +36,7 @@ class PulseLogger {
     this.onError,
   }) : _sanitizer = DataSanitizer(
           additionalSensitiveKeys: config.sensitiveKeys,
+          redactKeysBySubstring: config.redactKeysBySubstring,
         );
 
   /// Creates a logger that sends every event to multiple [transports].
@@ -52,7 +58,8 @@ class PulseLogger {
   /// Transport used to deliver events.
   final Transport transport;
 
-  /// Optional callback invoked when transport delivery fails.
+  /// Optional callback invoked when event preparation or transport delivery
+  /// fails.
   final PulseLoggerErrorCallback? onError;
 
   final DataSanitizer _sanitizer;
@@ -62,6 +69,7 @@ class PulseLogger {
     required String event,
     required String title,
     LogLevel level = LogLevel.info,
+    String? message,
     Map<String, dynamic> properties = const <String, dynamic>{},
     Object? error,
     StackTrace? stackTrace,
@@ -70,30 +78,40 @@ class PulseLogger {
       return;
     }
 
-    final logEvent = LogEvent(
-      event: event,
-      title: title,
-      level: level,
-      environment: config.environment,
-      appName: config.appName,
-      sessionId: config.sessionId,
-      properties: _sanitizedProperties(properties),
-      error: error,
-      stackTrace: stackTrace,
-    );
+    try {
+      final logEvent = LogEvent(
+        event: event,
+        title: title,
+        message: message,
+        level: level,
+        environment: config.environment,
+        appName: config.appName,
+        sessionId: config.sessionId,
+        properties: await _sanitizedProperties(properties),
+        error: error,
+        stackTrace: stackTrace,
+      );
 
-    await _send(logEvent);
+      await transport.send(logEvent);
+    } on Object catch (error, stackTrace) {
+      onError?.call(error, stackTrace);
+      if (!config.silentFailures) {
+        rethrow;
+      }
+    }
   }
 
   /// Tracks a debug event.
   Future<void> debug({
     required String event,
     required String title,
+    String? message,
     Map<String, dynamic> properties = const <String, dynamic>{},
   }) {
     return track(
       event: event,
       title: title,
+      message: message,
       level: LogLevel.debug,
       properties: properties,
     );
@@ -103,11 +121,13 @@ class PulseLogger {
   Future<void> info({
     required String event,
     required String title,
+    String? message,
     Map<String, dynamic> properties = const <String, dynamic>{},
   }) {
     return track(
       event: event,
       title: title,
+      message: message,
       level: LogLevel.info,
       properties: properties,
     );
@@ -117,11 +137,13 @@ class PulseLogger {
   Future<void> warning({
     required String event,
     required String title,
+    String? message,
     Map<String, dynamic> properties = const <String, dynamic>{},
   }) {
     return track(
       event: event,
       title: title,
+      message: message,
       level: LogLevel.warning,
       properties: properties,
     );
@@ -131,6 +153,7 @@ class PulseLogger {
   Future<void> error({
     required String event,
     required String title,
+    String? message,
     Object? error,
     StackTrace? stackTrace,
     Map<String, dynamic> properties = const <String, dynamic>{},
@@ -138,6 +161,7 @@ class PulseLogger {
     return track(
       event: event,
       title: title,
+      message: message,
       level: LogLevel.error,
       properties: properties,
       error: error,
@@ -149,6 +173,7 @@ class PulseLogger {
   Future<void> critical({
     required String event,
     required String title,
+    String? message,
     Object? error,
     StackTrace? stackTrace,
     Map<String, dynamic> properties = const <String, dynamic>{},
@@ -156,6 +181,7 @@ class PulseLogger {
     return track(
       event: event,
       title: title,
+      message: message,
       level: LogLevel.critical,
       properties: properties,
       error: error,
@@ -166,9 +192,14 @@ class PulseLogger {
   /// Releases resources held by the underlying transport.
   Future<void> dispose() => transport.dispose();
 
-  Map<String, dynamic> _sanitizedProperties(Map<String, dynamic> properties) {
+  Future<Map<String, dynamic>> _sanitizedProperties(
+    Map<String, dynamic> properties,
+  ) async {
     final merged = <String, dynamic>{
       ...config.defaultProperties,
+      if (config.includePlatformContext) ...platformContext(),
+      if (config.resolveProperties != null)
+        ...await config.resolveProperties!(),
       ...properties,
     };
 
@@ -181,16 +212,5 @@ class PulseLogger {
     }
 
     return _sanitizer.sanitize(merged);
-  }
-
-  Future<void> _send(LogEvent event) async {
-    try {
-      await transport.send(event);
-    } on Object catch (error, stackTrace) {
-      onError?.call(error, stackTrace);
-      if (!config.silentFailures) {
-        rethrow;
-      }
-    }
   }
 }

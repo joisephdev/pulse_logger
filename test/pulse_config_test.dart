@@ -12,10 +12,12 @@ void main() {
       expect(config.enabled, isTrue);
       expect(config.silentFailures, isTrue);
       expect(config.includePlatformContext, isTrue);
+      expect(config.redactKeysBySubstring, isTrue);
       expect(config.timeout, const Duration(seconds: 5));
       expect(config.minimumLevel, LogLevel.debug);
       expect(config.defaultProperties, isEmpty);
       expect(config.sensitiveKeys, isEmpty);
+      expect(config.resolveProperties, isNull);
     });
 
     test('copies default properties and custom sensitive keys', () {
@@ -52,6 +54,18 @@ void main() {
       expect(config.sessionId, 'session-1');
       expect(config.appVersion, '1.2.3');
       expect(config.buildNumber, '42');
+    });
+
+    test('keeps optional dynamic property resolver', () async {
+      final config = PulseConfig(
+        environment: 'QA',
+        appName: 'My App',
+        resolveProperties: () => <String, dynamic>{'user_id': '123'},
+      );
+
+      expect(await config.resolveProperties!(), <String, dynamic>{
+        'user_id': '123',
+      });
     });
   });
 }

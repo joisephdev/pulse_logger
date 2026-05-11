@@ -7,8 +7,10 @@
 /// ```
 class DataSanitizer {
   /// Creates a sanitizer that merges built-in keys with user-provided keys.
-  DataSanitizer({Iterable<String> additionalSensitiveKeys = const <String>[]})
-      : _sensitiveKeys = <String>{
+  DataSanitizer({
+    Iterable<String> additionalSensitiveKeys = const <String>[],
+    this.redactKeysBySubstring = true,
+  }) : _sensitiveKeys = <String>{
           for (final key in defaultSensitiveKeys) key.toLowerCase(),
           for (final key in additionalSensitiveKeys) key.toLowerCase(),
         };
@@ -32,6 +34,9 @@ class DataSanitizer {
   /// Marker used when a value has been redacted.
   static const String redactedValue = '[REDACTED]';
 
+  /// Whether keys containing sensitive fragments should be redacted.
+  final bool redactKeysBySubstring;
+
   final Set<String> _sensitiveKeys;
 
   /// Returns a sanitized copy of [properties] without mutating the input map.
@@ -43,7 +48,7 @@ class DataSanitizer {
   }
 
   dynamic _sanitizeValue(String key, dynamic value) {
-    if (_sensitiveKeys.contains(key.toLowerCase())) {
+    if (_isSensitiveKey(key)) {
       return redactedValue;
     }
 
@@ -76,5 +81,13 @@ class DataSanitizer {
     }
 
     return value;
+  }
+
+  bool _isSensitiveKey(String key) {
+    final normalizedKey = key.toLowerCase();
+    if (_sensitiveKeys.contains(normalizedKey)) {
+      return true;
+    }
+    return redactKeysBySubstring && _sensitiveKeys.any(normalizedKey.contains);
   }
 }

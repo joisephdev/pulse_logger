@@ -41,6 +41,13 @@ class ConsoleTransport implements Transport {
         ..write(event.sessionId);
     }
 
+    if (event.message != null && event.message!.trim().isNotEmpty) {
+      buffer
+        ..writeln()
+        ..write('  message: ')
+        ..write(_truncate(event.message!.trim()));
+    }
+
     if (event.properties.isNotEmpty) {
       buffer
         ..writeln()
@@ -101,5 +108,12 @@ class ConsoleTransport implements Transport {
     const encoder = JsonEncoder.withIndent('  ');
     final encoded = encoder.convert(properties).split('\n');
     return encoded.map((line) => '  $line').join('\n');
+  }
+
+  String _truncate(String value, {int maxLength = 1800}) {
+    if (value.length <= maxLength) {
+      return value;
+    }
+    return '${value.substring(0, maxLength)}...';
   }
 }

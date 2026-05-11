@@ -7,6 +7,7 @@ void main() {
       final event = LogEvent(
         event: 'user_login_started',
         title: 'User login started',
+        message: 'The user selected Google as the auth provider.',
         level: LogLevel.info,
         timestamp: DateTime.utc(2026, 5, 1, 12, 30),
         environment: 'QA',
@@ -24,6 +25,7 @@ void main() {
       expect(output, contains('INFO user_login_started - User login started'));
       expect(output, contains('[QA / My App]'));
       expect(output, contains('session=session-1'));
+      expect(output, contains('message: The user selected Google'));
       expect(output, contains('  "user_id": "123"'));
       expect(output, contains('  "source": "google"'));
     });

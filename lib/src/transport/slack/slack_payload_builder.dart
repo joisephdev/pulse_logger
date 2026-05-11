@@ -37,6 +37,11 @@ class SlackPayloadBuilder {
         'type': 'context',
         'elements': <Map<String, dynamic>>[context],
       },
+      if (event.message != null && event.message!.trim().isNotEmpty)
+        <String, dynamic>{
+          'type': 'section',
+          'text': _mrkdwnText(_truncate(event.message!.trim())),
+        },
       <String, dynamic>{
         'type': 'section',
         'fields': fields,
@@ -130,5 +135,12 @@ class SlackPayloadBuilder {
   String _encode(Map<String, dynamic> value) {
     const encoder = JsonEncoder.withIndent('  ');
     return encoder.convert(value);
+  }
+
+  String _truncate(String value, {int maxLength = 1800}) {
+    if (value.length <= maxLength) {
+      return value;
+    }
+    return '${value.substring(0, maxLength)}...';
   }
 }
