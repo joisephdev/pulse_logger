@@ -1,37 +1,54 @@
 name: Release & Publish
 
 on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
   pull_request:
     types: [closed]
     branches: [main]
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version override (optional, e.g., 0.2.0)'
+        required: false
+        type: string
 
 jobs:
   release:
-    if: github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch'
+    if: (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') || (github.event_name == 'pull_request' && github.event.pull_request.merged == true) || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: write
       actions: write
       id-token: write
+      packages: write
+      pull-requests: read
 
     steps:
-      - name: Checkout
+      - name: Determine version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //')
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Detected version: $VERSION"
+
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.merge_commit_sha || (github.event_name == 'workflow_run' && github.event.workflow_run.head_sha) || 'main' }}
           fetch-depth: 0
+          persist-credentials: true
 
       - uses: dart-lang/setup-dart@v1
         with:
           sdk: stable
-
-      - name: Extract version from pubspec.yaml
-        id: version
-        run: |
-          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //')
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
-          echo "Detected version: $VERSION"
 
       - name: Check if tag already exists
         id: check_tag
