@@ -28,6 +28,17 @@ jobs:
       pull-requests: read
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.merge_commit_sha || (github.event_name == 'workflow_run' && github.event.workflow_run.head_sha) || 'main' }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
       - name: Determine version
         id: version
         run: |
@@ -39,17 +50,6 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
           echo "Detected version: $VERSION"
-
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.merge_commit_sha || (github.event_name == 'workflow_run' && github.event.workflow_run.head_sha) || 'main' }}
-          fetch-depth: 0
-          persist-credentials: true
-
-      - uses: dart-lang/setup-dart@v1
-        with:
-          sdk: stable
 
       - name: Check if tag already exists
         id: check_tag
@@ -96,7 +96,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          name: ${{ steps.version.outputs.tag }}
+          name: "${{ steps.version.outputs.tag }}"
           body: ${{ steps.changelog.outputs.notes }}
           generate_release_notes: false
 
