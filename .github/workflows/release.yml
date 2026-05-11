@@ -56,7 +56,8 @@ jobs:
         run: |
           if git tag -l "v${{ steps.version.outputs.version }}" | grep -q .; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "::warning::Tag v${{ steps.version.outputs.version }} already exists. Skipping release."
+            echo "::error::Tag v${{ steps.version.outputs.version }} already exists. Aborting release."
+            exit 1
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
