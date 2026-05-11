@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added optional long-form event messages that Slack and console transports can render separately from the event title.
-- Added dynamic property enrichment through `PulseConfig.resolveProperties`, allowing host apps to attach current user/session context without coupling `pulse_logger` to Flutter or GetX.
+- Added dynamic property enrichment through `PulseConfig.resolveProperties`, allowing host apps to attach current user/session context without coupling `pulse_logger` to Flutter.
 - Added runtime platform context collection behind `PulseConfig.includePlatformContext`.
 - Added fragment-aware sensitive key matching through `PulseConfig.redactKeysBySubstring`.
 
