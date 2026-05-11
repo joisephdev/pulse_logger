@@ -2,12 +2,7 @@ name: Release & Publish
 run-name: Release & Publish
 
 on:
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
-    branches: [main]
-  pull_request:
-    types: [closed]
+  push:
     branches: [main]
   workflow_dispatch:
     inputs:
@@ -18,7 +13,7 @@ on:
 
 jobs:
   release:
-    if: (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') || (github.event_name == 'pull_request' && github.event.pull_request.merged == true) || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -31,7 +26,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.merge_commit_sha || (github.event_name == 'workflow_run' && github.event.workflow_run.head_sha) || 'main' }}
           fetch-depth: 0
           persist-credentials: true
 
@@ -56,7 +50,8 @@ jobs:
         run: |
           if git tag -l "v${{ steps.version.outputs.version }}" | grep -q .; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "::warning::Tag v${{ steps.version.outputs.version }} already exists. Skipping release."
+            echo "::error::Tag v${{ steps.version.outputs.version }} already exists. Aborting release."
+            exit 1
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
