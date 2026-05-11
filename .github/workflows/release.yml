@@ -1,4 +1,5 @@
 name: Release & Publish
+run-name: Release & Publish
 
 on:
   workflow_run:
