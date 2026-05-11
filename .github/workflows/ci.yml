@@ -1,12 +1,12 @@
-name: CI
-run-name: CI
+name: CI / Quality Checks
+run-name: CI / Quality Checks
 
 on:
   pull_request:
     branches: [main]
 
 jobs:
-  analyze:
+  quality-checks:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
