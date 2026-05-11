@@ -15,6 +15,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Flutter-specific helpers.
 - Additional transports.
 
+## [0.2.0] - 2026-05-11
+
+### Added
+
+- Added optional long-form event messages that Slack and console transports can render separately from the event title.
+- Added dynamic property enrichment through `PulseConfig.resolveProperties`, allowing host apps to attach current user/session context without coupling `pulse_logger` to Flutter or GetX.
+- Added runtime platform context collection behind `PulseConfig.includePlatformContext`.
+- Added fragment-aware sensitive key matching through `PulseConfig.redactKeysBySubstring`.
+
+### Changed
+
+- `PulseLogger` now applies the existing silent failure and `onError` policy to event preparation failures as well as transport failures.
+- Isolated the default Slack HTTP client behind platform-specific internals so web consumers can compile when they provide the `post` override.
+- Updated README and example coverage for migration from an app-specific Slack logger, Flutter Web transport overrides, and richer event context.
+
 ## [0.1.1] - 2026-05-03
 
 ### Changed

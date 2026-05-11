@@ -28,6 +28,7 @@ void main() {
     test('renders core metadata and properties', () {
       final payload = builder.build(
         _event(
+          message: 'The user selected Google as the auth provider.',
           properties: <String, dynamic>{
             'user_id': '123',
             'source': 'google',
@@ -42,6 +43,7 @@ void main() {
       expect(serialized, contains('QA'));
       expect(serialized, contains('My App'));
       expect(serialized, contains('session-1'));
+      expect(serialized, contains('The user selected Google'));
       expect(serialized, contains('user_id'));
       expect(serialized, contains('google'));
     });
@@ -62,6 +64,7 @@ void main() {
 }
 
 LogEvent _event({
+  String? message,
   Map<String, dynamic> properties = const <String, dynamic>{},
   Object? error,
   StackTrace? stackTrace,
@@ -69,6 +72,7 @@ LogEvent _event({
   return LogEvent(
     event: 'user_login_started',
     title: 'User login started',
+    message: message,
     level: LogLevel.info,
     timestamp: DateTime.utc(2026, 5, 1, 12, 30),
     environment: 'QA',

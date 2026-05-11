@@ -54,6 +54,37 @@ void main() {
       expect(sanitized['EMAIL'], DataSanitizer.redactedValue);
     });
 
+    test('redacts keys containing sensitive fragments by default', () {
+      final sanitizer = DataSanitizer(additionalSensitiveKeys: <String>[
+        'email',
+      ]);
+      final sanitized = sanitizer.sanitize(<String, dynamic>{
+        'firebase_id_token': 'abc',
+        'user_email_address': 'person@example.com',
+        'safe': 'visible',
+      });
+
+      expect(sanitized['firebase_id_token'], DataSanitizer.redactedValue);
+      expect(sanitized['user_email_address'], DataSanitizer.redactedValue);
+      expect(sanitized['safe'], 'visible');
+    });
+
+    test('can disable substring key matching', () {
+      final sanitizer = DataSanitizer(
+        additionalSensitiveKeys: <String>['email'],
+        redactKeysBySubstring: false,
+      );
+      final sanitized = sanitizer.sanitize(<String, dynamic>{
+        'firebase_id_token': 'abc',
+        'user_email_address': 'person@example.com',
+        'token': 'def',
+      });
+
+      expect(sanitized['firebase_id_token'], 'abc');
+      expect(sanitized['user_email_address'], 'person@example.com');
+      expect(sanitized['token'], DataSanitizer.redactedValue);
+    });
+
     test('sanitizes nested maps and lists of maps', () {
       final sanitizer = DataSanitizer();
       final sanitized = sanitizer.sanitize(<String, dynamic>{

@@ -48,6 +48,7 @@ void main() {
       final event = LogEvent(
         event: 'payment_failed',
         title: 'Payment failed',
+        message: 'Gateway rejected the transaction.',
         level: LogLevel.error,
         timestamp: timestamp,
         error: error,
@@ -59,6 +60,7 @@ void main() {
 
       expect(event.error, same(error));
       expect(event.stackTrace, same(stackTrace));
+      expect(event.message, 'Gateway rejected the transaction.');
       expect(event.sessionId, 'session-1');
       expect(event.timestamp.isUtc, isTrue);
     });

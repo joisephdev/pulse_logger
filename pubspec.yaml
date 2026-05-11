@@ -1,6 +1,6 @@
 name: pulse_logger
 description: Dart-first operational event logger for sending sanitized app events to Console and Slack transports.
-version: 0.1.1
+version: 0.2.0
 repository: https://github.com/joicodev/pulse_logger
 issue_tracker: https://github.com/joicodev/pulse_logger/issues
 

@@ -1,4 +1,9 @@
+import 'dart:async';
+
 import '../core/log_level.dart';
+
+/// Resolves dynamic properties that are merged into each emitted event.
+typedef PulsePropertiesResolver = FutureOr<Map<String, dynamic>> Function();
 
 /// Immutable runtime configuration shared by Pulse Logger components.
 ///
@@ -17,10 +22,12 @@ class PulseConfig {
     this.enabled = true,
     this.silentFailures = true,
     this.includePlatformContext = true,
+    this.redactKeysBySubstring = true,
     this.timeout = const Duration(seconds: 5),
     this.minimumLevel = LogLevel.debug,
     Map<String, dynamic> defaultProperties = const <String, dynamic>{},
     Iterable<String> sensitiveKeys = const <String>[],
+    this.resolveProperties,
     this.sessionId,
     this.appVersion,
     this.buildNumber,
@@ -49,11 +56,17 @@ class PulseConfig {
   /// Whether platform context should be collected when available.
   final bool includePlatformContext;
 
+  /// Whether sensitive keys redact keys that contain known fragments.
+  final bool redactKeysBySubstring;
+
   /// Timeout budget used by transports that perform I/O.
   final Duration timeout;
 
   /// Additional sensitive keys redacted by the logging pipeline.
   final List<String> sensitiveKeys;
+
+  /// Optional callback used to resolve dynamic properties for each event.
+  final PulsePropertiesResolver? resolveProperties;
 
   /// Optional session identifier attached to emitted events.
   final String? sessionId;

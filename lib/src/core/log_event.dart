@@ -21,6 +21,7 @@ class LogEvent {
     required String environment,
     required String appName,
     DateTime? timestamp,
+    String? message,
     Map<String, dynamic> properties = const <String, dynamic>{},
     Object? error,
     StackTrace? stackTrace,
@@ -29,6 +30,7 @@ class LogEvent {
     return LogEvent._(
       event: event,
       title: title,
+      message: message,
       level: level,
       timestamp: (timestamp ?? DateTime.now()).toUtc(),
       properties: Map<String, dynamic>.unmodifiable(properties),
@@ -43,6 +45,7 @@ class LogEvent {
   const LogEvent._({
     required this.event,
     required this.title,
+    this.message,
     required this.level,
     required this.timestamp,
     required this.properties,
@@ -58,6 +61,9 @@ class LogEvent {
 
   /// Human-readable event title for transport formatters.
   final String title;
+
+  /// Optional long-form event details for rich transports.
+  final String? message;
 
   /// Severity level for routing and filtering.
   final LogLevel level;

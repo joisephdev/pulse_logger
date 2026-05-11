@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import '../../core/log_event.dart';
 import '../transport.dart';
+import 'slack_http_client.dart';
 import 'slack_payload_builder.dart';
 
 /// Exception thrown when Slack delivery fails.
@@ -54,7 +54,7 @@ class SlackTransport implements Transport {
     )? post,
     SlackPayloadBuilder? payloadBuilder,
   })  : webhookUrl = Uri.parse(webhookUrl),
-        _httpClient = post == null ? HttpClient() : null,
+        _httpClient = post == null ? SlackHttpClient() : null,
         _postOverride = post,
         _payloadBuilder = payloadBuilder ?? const SlackPayloadBuilder();
 
@@ -64,7 +64,7 @@ class SlackTransport implements Transport {
   /// Timeout budget for webhook POST requests.
   final Duration timeout;
 
-  final HttpClient? _httpClient;
+  final SlackHttpClient? _httpClient;
   final Future<({int statusCode, String body})> Function(
     Uri url,
     Map<String, String> headers,
@@ -87,7 +87,7 @@ class SlackTransport implements Transport {
 
   @override
   Future<void> dispose() async {
-    _httpClient?.close(force: true);
+    _httpClient?.close();
   }
 
   Future<({int statusCode, String body})> _post(
@@ -106,15 +106,11 @@ class SlackTransport implements Transport {
       final client = _httpClient;
       if (client == null) {
         throw const SlackTransportException(
-            'Slack transport is not initialized.');
+          'Slack transport is not initialized.',
+        );
       }
 
-      final request = await client.postUrl(webhookUrl).timeout(timeout);
-      headers.forEach(request.headers.set);
-      request.write(body);
-      final response = await request.close().timeout(timeout);
-      final responseBody = await utf8.decodeStream(response).timeout(timeout);
-      return (statusCode: response.statusCode, body: responseBody);
+      return await client.post(webhookUrl, headers, body).timeout(timeout);
     } on SlackTransportException {
       rethrow;
     } on TimeoutException catch (error) {
