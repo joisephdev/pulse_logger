@@ -13,6 +13,11 @@
 - Keep internal helpers internal unless there is a strong reason to expose them. `DataSanitizer` should remain internal by default.
 - Prefer small, composable additions over adding framework-heavy abstractions.
 
+## Git attribution
+
+- Never set **Cursor** (or similar tooling accounts) as **author** or **committer**.
+- Never add **`Co-authored-by: Cursor`** (or variants) to commit messages.
+
 ## Quality Gates
 
 Before considering work complete, run:
