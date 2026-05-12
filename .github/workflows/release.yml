@@ -2,13 +2,9 @@ name: Release & Publish
 run-name: Release & Publish
 
 on:
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
-    branches: [main]
-  pull_request:
-    types: [closed]
-    branches: [main]
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
       version:
@@ -18,7 +14,7 @@ on:
 
 jobs:
   release:
-    if: (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') || (github.event_name == 'pull_request' && github.event.pull_request.merged == true) || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -31,7 +27,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.merge_commit_sha || (github.event_name == 'workflow_run' && github.event.workflow_run.head_sha) || 'main' }}
+          ref: ${{ github.event_name == 'push' && github.ref || 'main' }}
           fetch-depth: 0
           persist-credentials: true
 
@@ -45,7 +41,7 @@ jobs:
           if [ -n "${{ github.event.inputs.version }}" ]; then
             VERSION="${{ github.event.inputs.version }}"
           else
-            VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //')
+            VERSION="${GITHUB_REF#refs/tags/v}"
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
@@ -54,13 +50,14 @@ jobs:
       - name: Check if tag already exists
         id: check_tag
         run: |
-          if git tag -l "v${{ steps.version.outputs.version }}" | grep -q .; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "::error::Tag v${{ steps.version.outputs.version }} already exists. Aborting release."
-            exit 1
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            if git tag -l "v${{ steps.version.outputs.version }}" | grep -q .; then
+              echo "exists=true" >> "$GITHUB_OUTPUT"
+              echo "::error::Tag v${{ steps.version.outputs.version }} already exists. Aborting release."
+              exit 1
+            fi
           fi
+          echo "exists=false" >> "$GITHUB_OUTPUT"
 
       - name: Validate package (dry-run)
         if: steps.check_tag.outputs.exists == 'false'
