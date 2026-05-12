@@ -1,33 +1,24 @@
 name: Release & Publish
-run-name: Release & Publish
 
 on:
-  push:
-    tags:
-      - 'v*'
+  pull_request:
+    types: [closed]
+    branches: [main]
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version override (optional, e.g., 0.2.0)'
-        required: false
-        type: string
 
 jobs:
   release:
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    if: github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: write
       actions: write
-      id-token: write
-      packages: write
       pull-requests: read
 
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'push' && github.ref || 'main' }}
           fetch-depth: 0
           persist-credentials: true
 
@@ -35,14 +26,10 @@ jobs:
         with:
           sdk: stable
 
-      - name: Determine version
+      - name: Extract version from pubspec.yaml
         id: version
         run: |
-          if [ -n "${{ github.event.inputs.version }}" ]; then
-            VERSION="${{ github.event.inputs.version }}"
-          else
-            VERSION="${GITHUB_REF#refs/tags/v}"
-          fi
+          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //')
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
           echo "Detected version: $VERSION"
@@ -50,14 +37,13 @@ jobs:
       - name: Check if tag already exists
         id: check_tag
         run: |
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            if git tag -l "v${{ steps.version.outputs.version }}" | grep -q .; then
-              echo "exists=true" >> "$GITHUB_OUTPUT"
-              echo "::error::Tag v${{ steps.version.outputs.version }} already exists. Aborting release."
-              exit 1
-            fi
+          if git tag -l "v${{ steps.version.outputs.version }}" | grep -q .; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "::error::Tag v${{ steps.version.outputs.version }} already exists. Aborting release."
+            exit 1
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
-          echo "exists=false" >> "$GITHUB_OUTPUT"
 
       - name: Validate package (dry-run)
         if: steps.check_tag.outputs.exists == 'false'
@@ -94,19 +80,12 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          name: "${{ steps.version.outputs.tag }}"
+          name: ${{ steps.version.outputs.tag }}
           body: ${{ steps.changelog.outputs.notes }}
           generate_release_notes: false
 
-      - name: Checkout release tag for pub.dev
+      - name: Trigger publish to pub.dev
         if: steps.check_tag.outputs.exists == 'false'
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ steps.version.outputs.tag }}
-
-      - name: Publish to pub.dev
-        if: steps.check_tag.outputs.exists == 'false'
-        run: |
-          dart pub get
-          dart pub publish --dry-run
-          dart pub publish --force
+        run: gh workflow run publish.yml --ref ${{ steps.version.outputs.tag }}
+        env:
+          GH_TOKEN: ${{ github.token }}
